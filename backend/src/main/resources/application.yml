@@ -13,7 +13,7 @@ spring:
     name: esports-nexus-backend
 
   datasource:
-    url: jdbc:mysql://${DB_HOST:${MYSQLHOST:localhost}}:${DB_PORT:${MYSQLPORT:3306}}/${DB_NAME:${MYSQLDATABASE:${MYSQL_DATABASE:esports_nexus}}}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    url: jdbc:mysql://${DB_HOST:${MYSQLHOST:localhost}}:${DB_PORT:${MYSQLPORT:3306}}/${DB_NAME:${MYSQLDATABASE:${MYSQL_DATABASE:railway}}}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
     username: ${DB_USERNAME:${MYSQLUSER:root}}
     password: ${DB_PASSWORD:${MYSQLPASSWORD:${MYSQL_ROOT_PASSWORD:root}}}
     driver-class-name: com.mysql.cj.jdbc.Driver

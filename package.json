@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "npm run dev --prefix frontend",
     "build": "npm run build --prefix frontend",
+    "vercel-build": "npm --prefix frontend install && npm --prefix frontend run build",
     "preview": "npm run preview --prefix frontend",
     "backend:test": "cd backend && mvnw.cmd test",
     "backend:build": "cd backend && mvnw.cmd package",

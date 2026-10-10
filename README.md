@@ -81,36 +81,37 @@
 ## 🏛️ System Architecture
 
 ```mermaid
-graph TD
-    subgraph Client["🖥️ Frontend Client (React 19 + TypeScript + Vite)"]
-        UI["Atomic Design UI & Pages"]
-        ThreeCanvas["Three.js 3D WebGL Canvas (Orb & Trophy)"]
-        AuthCtx["AuthContext (Session State)"]
-        ViteProxy["Vite Dev Server (Port 3000 /api Proxy)"]
+flowchart TD
+    subgraph Client ["Client Layer - React 19 + TypeScript + Vite"]
+        UI["Atomic UI & Pages"]
+        ThreeCanvas["Three.js 3D WebGL Canvas"]
+        AuthCtx["AuthContext - Session State"]
+        ViteProxy["Vite Dev Server Proxy - Port 3000"]
+
         UI --> AuthCtx
         UI --> ThreeCanvas
         UI --> ViteProxy
     end
 
-    subgraph Backend["⚙️ Backend Server (Java 21 + Spring Boot 3.4)"]
-        SecFilter["Spring Security Filter Chain (Cookie Session)"]
-        REST["REST API Controllers (/api/v1/*)"]
-        ServiceLayer["Service Layer (Business Logic & Validations)"]
-        Flyway["Flyway Migration Engine (19 Relational Tables)"]
-        JPA["Spring Data JPA (Hibernate 6)"]
+    subgraph Backend ["Backend Layer - Java 21 + Spring Boot 3.4"]
+        SecFilter["Spring Security Filter Chain"]
+        REST["REST API Controllers"]
+        ServiceLayer["Service Layer - Business Logic"]
+        Flyway["Flyway Migration Engine"]
+        JPA["Spring Data JPA - Hibernate 6"]
 
         SecFilter --> REST
         REST --> ServiceLayer
         ServiceLayer --> JPA
     end
 
-    subgraph Database["🗄️ Database Layer"]
-        MySQL[("MySQL 8.0 Server\nesports_nexus")]
-        Flyway -.->|Runs V1 Migrations| MySQL
-        JPA -->|HikariCP Pool (Port 3306)| MySQL
+    subgraph Database ["Database Layer"]
+        MySQL[("MySQL 8.0 Database")]
+        Flyway -.->|"Schema Migrations"| MySQL
+        JPA -->|"HikariCP Pool - Port 3306"| MySQL
     end
 
-    ViteProxy -->|Reverse Proxy /api| SecFilter
+    ViteProxy -->|"Proxy /api Requests"| SecFilter
 ```
 
 <br />

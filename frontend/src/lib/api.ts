@@ -29,14 +29,25 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     'Accept': 'application/json',
   }
 
-  const response = await fetch(url, {
-    ...options,
-    credentials: 'include', // Ensures session cookies (JSESSIONID) are transmitted safely
-    headers: {
-      ...defaultHeaders,
-      ...options.headers,
-    },
-  })
+  let response: Response
+  try {
+    response = await fetch(url, {
+      ...options,
+      credentials: 'include', // Ensures session cookies (JSESSIONID) are transmitted safely
+      headers: {
+        ...defaultHeaders,
+        ...options.headers,
+      },
+    })
+  } catch (netErr: any) {
+    const errorData: ApiErrorResponse = {
+      status: 0,
+      error: 'NetworkOffline',
+      message: netErr?.message || 'Network request failed. Backend server may be offline or unreachable.',
+      timestamp: new Date().toISOString(),
+    }
+    throw errorData
+  }
 
   if (!response.ok) {
     let errorData: ApiErrorResponse

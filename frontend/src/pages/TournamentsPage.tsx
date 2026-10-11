@@ -1,23 +1,31 @@
-import React, { useState, useEffect, useMemo } from 'react'
-import { Trophy, Search, X, Zap, Filter, ShieldCheck, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { Trophy, Search, X, Zap, Filter, ShieldCheck, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react'
 import { MOCK_TOURNAMENTS } from '../data/mockTournaments'
 import { TournamentCard } from '../components/tournaments/TournamentCard'
+import { TournamentCardSkeleton } from '../components/tournaments/TournamentCardSkeleton'
 import { Tournament } from '../types/tournament'
 import { tournamentsApi } from '../lib/api'
 import { mapBackendTournament, BackendTournament } from '../lib/mappers'
 import { useAuth } from '../context/AuthContext'
 import { playCyberClick, playJoinSuccess } from '../lib/sound'
 
+// In-memory module cache to eliminate refetch delays and redundant API calls across page navigation
+let cachedTournaments: Tournament[] | null = null
+let cacheTimestamp = 0
+const CACHE_TTL_MS = 120_000 // 2 minutes cache validity
+
 const GAME_OPTIONS = [
-  { value: 'all',           label: 'All Games',         emoji: '⚡' },
-  { value: 'bgmi',          label: 'BGMI / PUBG',       emoji: '🎖️' },
-  { value: 'cyberpunk',     label: 'Cyberpunk 2077',    emoji: '🌆' },
-  { value: 'valorant',      label: 'Valorant',           emoji: '🎯' },
-  { value: 'apex',          label: 'Apex Legends',       emoji: '🔥' },
-  { value: 'cs2',           label: 'CS2',                emoji: '💥' },
-  { value: 'lol',           label: 'League of Legends',  emoji: '⚔️' },
-  { value: 'rocket-league', label: 'Rocket League',      emoji: '🚀' },
-  { value: 'dota2',         label: 'Dota 2',             emoji: '🛡️' },
+  { value: 'all',                label: 'All Games',            emoji: '⚡' },
+  { value: 'pubg-mobile',        label: 'PUBG MOBILE',          emoji: '📱' },
+  { value: 'bgmi',               label: 'BGMI',                 emoji: '🎖️' },
+  { value: 'valorant',           label: 'Valorant',             emoji: '🎯' },
+  { value: 'cs2',                label: 'Counter-Strike 2',     emoji: '💥' },
+  { value: 'lol',                label: 'League of Legends',    emoji: '⚔️' },
+  { value: 'fortnite',           label: 'Fortnite',             emoji: '⛏️' },
+  { value: 'pubg-battlegrounds', label: 'PUBG: BATTLEGROUNDS',  emoji: '🪂' },
+  { value: 'apex',               label: 'Apex Legends',         emoji: '🔥' },
+  { value: 'rocket-league',      label: 'Rocket League',        emoji: '🚀' },
+  { value: 'dota2',              label: 'Dota 2',               emoji: '🛡️' },
 ]
 
 const STATUS_OPTIONS = [
@@ -200,7 +208,7 @@ function RegistrationModal({ tournament, onClose, onRegistered }: { tournament: 
                 >
                   {isSubmitting ? (
                     <span className="flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <RefreshCw className="w-4 h-4 animate-spin" />
                       Submitting...
                     </span>
                   ) : (
@@ -220,55 +228,81 @@ function RegistrationModal({ tournament, onClose, onRegistered }: { tournament: 
 }
 
 export const TournamentsPage: React.FC = () => {
-  const [tournaments, setTournaments] = useState<Tournament[]>(MOCK_TOURNAMENTS)
-  const [isLoading, setIsLoading] = useState(true)
+  const [tournaments, setTournaments] = useState<Tournament[]>(() => cachedTournaments || MOCK_TOURNAMENTS)
+  const [isLoading, setIsLoading] = useState(() => !cachedTournaments)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [errorNotice, setErrorNotice] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [game, setGame] = useState('all')
   const [status, setStatus] = useState('all')
   const [modalTournament, setModalTournament] = useState<Tournament | null>(null)
 
-  // Fetch live tournaments from Spring Boot backend
-  useEffect(() => {
-    let mounted = true
-    const fetchTournaments = async () => {
-      try {
-        const data = (await tournamentsApi.getAll()) as BackendTournament[]
-        if (mounted && Array.isArray(data) && data.length > 0) {
-          const mapped = data.map(mapBackendTournament)
-          // Merge live tournaments with rich featured mock tournaments (avoid duplicate IDs)
-          const merged = [...mapped]
-          MOCK_TOURNAMENTS.forEach(mock => {
-            if (!merged.some(m => m.id === mock.id || m.title === mock.title)) {
-              merged.push(mock)
-            }
-          })
-          setTournaments(merged)
-        }
-      } catch {
-        // Fallback to local high-fidelity tournaments
-        if (mounted) {
-          setTournaments(MOCK_TOURNAMENTS)
-        }
-      } finally {
-        if (mounted) {
-          setIsLoading(false)
-        }
-      }
+  // Safe data fetching with in-memory caching and stale-while-revalidate
+  const loadTournaments = useCallback(async (isManualRefresh = false) => {
+    const isCacheValid = cachedTournaments && (Date.now() - cacheTimestamp < CACHE_TTL_MS)
+
+    if (!isManualRefresh && isCacheValid) {
+      setTournaments(cachedTournaments!)
+      setIsLoading(false)
+      return
     }
 
-    fetchTournaments()
-    return () => {
-      mounted = false
+    if (isManualRefresh) {
+      setIsRefreshing(true)
+    } else if (!cachedTournaments) {
+      setIsLoading(true)
+    }
+
+    setErrorNotice(null)
+
+    try {
+      const data = (await tournamentsApi.getAll()) as BackendTournament[]
+      if (Array.isArray(data) && data.length > 0) {
+        const mapped = data.map(mapBackendTournament)
+        // Merge live tournaments with rich concept mock tournaments (avoid duplicate titles or IDs)
+        const merged = [...mapped]
+        MOCK_TOURNAMENTS.forEach(mock => {
+          if (!merged.some(m => m.id === mock.id || m.title === mock.title)) {
+            merged.push(mock)
+          }
+        })
+        cachedTournaments = merged
+        cacheTimestamp = Date.now()
+        setTournaments(merged)
+      } else {
+        cachedTournaments = MOCK_TOURNAMENTS
+        cacheTimestamp = Date.now()
+        setTournaments(MOCK_TOURNAMENTS)
+      }
+    } catch {
+      // Graceful fallback to rich local concept tournaments
+      if (!cachedTournaments) {
+        cachedTournaments = MOCK_TOURNAMENTS
+        cacheTimestamp = Date.now()
+        setTournaments(MOCK_TOURNAMENTS)
+      }
+      setErrorNotice('Backend sync offline. Showing local tournament roster with realistic artwork.')
+    } finally {
+      setIsLoading(false)
+      setIsRefreshing(false)
     }
   }, [])
 
+  useEffect(() => {
+    loadTournaments()
+  }, [loadTournaments])
+
   const filtered = useMemo(() => tournaments.filter(t => {
-    const q = search.toLowerCase()
-    return (
-      (t.title.toLowerCase().includes(q) || t.gameTitle.toLowerCase().includes(q)) &&
-      (game === 'all' || t.gameCode === game) &&
-      (status === 'all' || t.status === status)
-    )
+    const q = search.toLowerCase().trim()
+    const matchesSearch = !q ||
+      t.title.toLowerCase().includes(q) ||
+      t.gameTitle.toLowerCase().includes(q) ||
+      t.gameCode.toLowerCase().includes(q)
+
+    const matchesGame = game === 'all' || t.gameCode === game
+    const matchesStatus = status === 'all' || t.status === status
+
+    return matchesSearch && matchesGame && matchesStatus
   }), [tournaments, search, game, status])
 
   const hasFilters = search || game !== 'all' || status !== 'all'
@@ -283,11 +317,40 @@ export const TournamentsPage: React.FC = () => {
           </div>
           <span className="section-eyebrow">Competitive Discovery</span>
         </div>
-        <h1 className="section-title" style={{ fontSize: 'clamp(36px, 5vw, 56px)' }}>Sanctioned Tournaments</h1>
-        <p style={{ marginTop: '10px', fontSize: '14px', color: 'rgba(180, 189, 219, 0.65)', maxWidth: '580px' }}>
-          Browse open registrations, live check-ins, and active tournament brackets. Filter by game, status, and format.
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="section-title" style={{ fontSize: 'clamp(36px, 5vw, 56px)' }}>Sanctioned Tournaments</h1>
+            <p style={{ marginTop: '10px', fontSize: '14px', color: 'rgba(180, 189, 219, 0.65)', maxWidth: '580px' }}>
+              Browse open registrations, live check-ins, and active tournament brackets. Filter by game, status, and format.
+            </p>
+          </div>
+          <button
+            onClick={() => loadTournaments(true)}
+            disabled={isRefreshing || isLoading}
+            className="btn-nexus-ghost flex items-center gap-2 text-xs py-2 px-3 border border-violet-500/30 hover:border-violet-500/60 rounded-xl"
+            title="Refresh tournament roster"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span>{isRefreshing ? 'Syncing...' : 'Refresh Grid'}</span>
+          </button>
+        </div>
       </div>
+
+      {/* Network notice banner if applicable */}
+      {errorNotice && (
+        <div className="mb-6 p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/30 flex items-center justify-between text-xs text-amber-200">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <span>{errorNotice}</span>
+          </div>
+          <button
+            onClick={() => loadTournaments(true)}
+            className="underline text-amber-300 hover:text-white font-mono ml-4"
+          >
+            Retry Sync
+          </button>
+        </div>
+      )}
 
       {/* Filters bar */}
       <div style={{
@@ -328,7 +391,7 @@ export const TournamentsPage: React.FC = () => {
               playCyberClick()
               setGame(e.target.value)
             }}
-            style={{ cursor: 'pointer', minWidth: '150px' }}
+            style={{ cursor: 'pointer', minWidth: '170px' }}
           >
             {GAME_OPTIONS.map(g => (
               <option key={g.value} value={g.value} style={{ background: '#0B0E1F', color: '#fff' }}>
@@ -380,11 +443,16 @@ export const TournamentsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Grid or Empty state */}
+      {/* Grid or Skeleton or Empty state */}
       {isLoading ? (
-        <div className="py-20 flex flex-col items-center justify-center gap-3">
-          <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
-          <p className="font-mono text-xs text-slate-400">Loading sanctioned tournaments from Nexus grid...</p>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+          gap: '24px',
+        }}>
+          {Array.from({ length: 6 }).map((_, idx) => (
+            <TournamentCardSkeleton key={idx} />
+          ))}
         </div>
       ) : filtered.length > 0 ? (
         <div style={{
@@ -437,11 +505,16 @@ export const TournamentsPage: React.FC = () => {
           tournament={modalTournament}
           onClose={() => setModalTournament(null)}
           onRegistered={() => {
-            // Optimistically update slots
-            setTournaments(prev => prev.map(t => t.id === modalTournament.id ? { ...t, currentTeams: Math.min(t.maxTeams, t.currentTeams + 1) } : t))
+            // Optimistically update slots and update cache
+            setTournaments(prev => {
+              const updated = prev.map(t => t.id === modalTournament.id ? { ...t, currentTeams: Math.min(t.maxTeams, t.currentTeams + 1) } : t)
+              cachedTournaments = updated
+              return updated
+            })
           }}
         />
       )}
     </div>
   )
 }
+

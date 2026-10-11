@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Trophy,
@@ -8,7 +8,8 @@ import {
   ArrowRight,
   Zap,
   CheckCircle2,
-  Sparkles
+  AlertCircle,
+  PlayCircle
 } from 'lucide-react'
 import { Tournament } from '../../types/tournament'
 import { playCyberClick, playCyberHover } from '../../lib/sound'
@@ -17,176 +18,208 @@ interface TournamentCardProps {
   tournament: Tournament
   onRegisterClick?: (tournament: Tournament) => void
   featured?: boolean
+  priority?: boolean
 }
 
-const GAME_STYLES: Record<
+// Canonical game theme tokens matching official brand colors
+export const GAME_STYLES: Record<
   string,
-  { label: string; primary: string; glow: string; emoji: string; avatar: string }
+  { label: string; primary: string; glow: string; emoji: string; fallback: string }
 > = {
-  bgmi: {
-    label: 'BGMI / PUBG',
+  'pubg-mobile': {
+    label: 'PUBG MOBILE',
     primary: '#F59E0B',
-    glow: 'rgba(245, 158, 11, 0.4)',
+    glow: 'rgba(245, 158, 11, 0.35)',
+    emoji: '🪖',
+    fallback: '/images/games/pubg-mobile.webp',
+  },
+  'bgmi': {
+    label: 'BGMI',
+    primary: '#10B981',
+    glow: 'rgba(16, 185, 129, 0.35)',
     emoji: '🎖️',
-    avatar: '/assets/bgmi_commando.jpg',
+    fallback: '/images/games/bgmi.webp',
   },
-  cyberpunk: {
-    label: 'Cyberpunk 2077',
-    primary: '#00E5FF',
-    glow: 'rgba(0, 229, 255, 0.45)',
-    emoji: '🌆',
-    avatar: '/assets/cyberpunk_character.jpg',
-  },
-  valorant: {
-    label: 'Valorant',
+  'valorant': {
+    label: 'VALORANT',
     primary: '#FF4655',
-    glow: 'rgba(255, 70, 85, 0.4)',
+    glow: 'rgba(255, 70, 85, 0.35)',
     emoji: '🎯',
-    avatar: '/assets/valorant_duelist.jpg',
+    fallback: '/images/games/valorant.webp',
   },
-  apex: {
-    label: 'Apex Legends',
-    primary: '#E11D48',
-    glow: 'rgba(225, 29, 72, 0.4)',
-    emoji: '🔥',
-    avatar: '/assets/gaming_banner_wide.jpg',
-  },
-  cs2: {
+  'cs2': {
     label: 'Counter-Strike 2',
     primary: '#F97316',
-    glow: 'rgba(249, 115, 22, 0.4)',
+    glow: 'rgba(249, 115, 22, 0.35)',
     emoji: '💥',
-    avatar: '/assets/bgmi_commando.jpg',
+    fallback: '/images/games/counter-strike-2.webp',
   },
-  lol: {
+  'lol': {
     label: 'League of Legends',
-    primary: '#C89B3C',
-    glow: 'rgba(200, 155, 60, 0.4)',
+    primary: '#0EA5E9',
+    glow: 'rgba(14, 165, 233, 0.35)',
     emoji: '⚔️',
-    avatar: '/assets/valorant_duelist.jpg',
+    fallback: '/images/games/league-of-legends.webp',
+  },
+  'fortnite': {
+    label: 'Fortnite',
+    primary: '#A855F7',
+    glow: 'rgba(168, 85, 247, 0.35)',
+    emoji: '⚡',
+    fallback: '/images/games/fortnite.webp',
+  },
+  'pubg-battlegrounds': {
+    label: 'PUBG: BATTLEGROUNDS',
+    primary: '#EAB308',
+    glow: 'rgba(234, 179, 8, 0.35)',
+    emoji: '🍳',
+    fallback: '/images/games/pubg-battlegrounds.webp',
+  },
+  'rocket-league': {
+    label: 'Rocket League',
+    primary: '#3B82F6',
+    glow: 'rgba(59, 130, 246, 0.35)',
+    emoji: '🚀',
+    fallback: '/images/games/game-fallback.webp',
+  },
+  'dota2': {
+    label: 'Dota 2',
+    primary: '#DC2626',
+    glow: 'rgba(220, 38, 38, 0.35)',
+    emoji: '🛡️',
+    fallback: '/images/games/game-fallback.webp',
   },
 }
 
 export const TournamentCard: React.FC<TournamentCardProps> = ({
   tournament,
   onRegisterClick,
-  featured,
+  featured = false,
+  priority = false,
 }) => {
-  const [hovered, setHovered] = useState(false)
-  const [tilt, setTilt] = useState({ x: 0, y: 0, glareX: 50, glareY: 50 })
-  const cardRef = useRef<HTMLDivElement>(null)
+  const [imageLoaded, setImageLoaded] = useState(false)
+  const [imgSrc, setImgSrc] = useState<string>(() => {
+    if (tournament.bannerUrl && !tournament.bannerUrl.includes('unsplash.com')) {
+      return tournament.bannerUrl
+    }
+    // Map canonical gameCode to local WebP asset
+    return GAME_STYLES[tournament.gameCode]?.fallback || '/images/games/game-fallback.webp'
+  })
 
   const isFull = tournament.currentTeams >= tournament.maxTeams
+  const isRegistrationOpen = tournament.status === 'REGISTRATION_OPEN' || tournament.status === 'CHECK_IN_LIVE'
   const capacityPct = Math.min(100, Math.round((tournament.currentTeams / tournament.maxTeams) * 100))
+
   const gameStyle = GAME_STYLES[tournament.gameCode] || {
     label: tournament.gameTitle,
-    primary: '#7C3AED',
-    glow: 'rgba(124, 58, 237, 0.35)',
+    primary: '#8B5CF6',
+    glow: 'rgba(139, 92, 246, 0.35)',
     emoji: '🎮',
-    avatar: '/assets/cyberpunk_character.jpg',
+    fallback: '/images/games/game-fallback.webp',
   }
 
-  // Format date like Dribbble card: "SAT, 24 OCT 18:00"
-  const formattedDate = new Date(tournament.startDate)
-    .toLocaleDateString('en-US', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    })
-    .toUpperCase()
+  // Format date: e.g. "SAT, OCT 25 • 17:30"
+  const formattedDate = new Date(tournament.startDate).toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).toUpperCase()
 
-  // Dynamic countdown
-  const countdowns = ['07:45:24', '12:25:50', '35:30:05', '04:12:48', '18:50:12']
-  const randomCountdown = countdowns[Math.abs(tournament.id.split('').reduce((a, b) => a + b.charCodeAt(0), 0)) % countdowns.length]
-
-  // Interactive 3D cursor tilt calculations
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!cardRef.current) return
-    const rect = cardRef.current.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
-    const centerX = rect.width / 2
-    const centerY = rect.height / 2
-    const rotateX = ((y - centerY) / centerY) * -8
-    const rotateY = ((x - centerX) / centerX) * 8
-    setTilt({
-      x: rotateX,
-      y: rotateY,
-      glareX: (x / rect.width) * 100,
-      glareY: (y / rect.height) * 100,
-    })
+  // Status visual attributes
+  const getStatusBadge = () => {
+    switch (tournament.status) {
+      case 'REGISTRATION_OPEN':
+        return {
+          label: 'Registration Open',
+          bg: 'bg-emerald-500/20',
+          border: 'border-emerald-500/40',
+          text: 'text-emerald-400',
+          dot: 'bg-emerald-500',
+        }
+      case 'CHECK_IN_LIVE':
+        return {
+          label: 'Check-In Live',
+          bg: 'bg-amber-500/20',
+          border: 'border-amber-500/40',
+          text: 'text-amber-400',
+          dot: 'bg-amber-500 animate-pulse',
+        }
+      case 'IN_PROGRESS':
+        return {
+          label: 'Live Matches',
+          bg: 'bg-rose-500/20',
+          border: 'border-rose-500/40',
+          text: 'text-rose-400',
+          dot: 'bg-rose-500 animate-ping',
+        }
+      case 'COMPLETED':
+        return {
+          label: 'Completed',
+          bg: 'bg-slate-500/20',
+          border: 'border-slate-500/40',
+          text: 'text-slate-400',
+          dot: 'bg-slate-500',
+        }
+      default:
+        return {
+          label: 'Upcoming',
+          bg: 'bg-cyan-500/20',
+          border: 'border-cyan-500/40',
+          text: 'text-cyan-400',
+          dot: 'bg-cyan-500',
+        }
+    }
   }
 
-  const handleMouseLeave = () => {
-    setHovered(false)
-    setTilt({ x: 0, y: 0, glareX: 50, glareY: 50 })
-  }
+  const statusBadge = getStatusBadge()
 
   return (
     <div
-      ref={cardRef}
-      onMouseEnter={() => {
-        setHovered(true)
-        playCyberHover()
-      }}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      className="relative rounded-2xl overflow-hidden flex flex-col group select-none transition-all duration-200"
+      onMouseEnter={playCyberHover}
+      className={`relative rounded-2xl overflow-hidden flex flex-col group select-none transition-all duration-300 ${
+        featured ? 'ring-2 ring-violet-500/40' : ''
+      }`}
       style={{
         background: 'rgba(12, 16, 36, 0.95)',
-        border: `1px solid ${hovered ? gameStyle.primary : 'rgba(124, 58, 237, 0.25)'}`,
-        boxShadow: hovered
-          ? `0 24px 50px -10px ${gameStyle.glow}, 0 0 30px rgba(124, 58, 237, 0.25)`
-          : '0 8px 30px -10px rgba(0, 0, 0, 0.5)',
-        transform: hovered
-          ? `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale3d(1.02, 1.02, 1.02)`
-          : 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)',
-        transformStyle: 'preserve-3d',
+        border: '1px solid rgba(124, 58, 237, 0.25)',
+        boxShadow: '0 8px 30px -10px rgba(0, 0, 0, 0.6)',
       }}
     >
-      {/* Specular Glare Shine Effect on 3D tilt */}
-      {hovered && (
-        <div
-          className="absolute inset-0 pointer-events-none z-30 transition-opacity duration-300"
-          style={{
-            background: `radial-gradient(circle at ${tilt.glareX}% ${tilt.glareY}%, rgba(255, 255, 255, 0.12) 0%, transparent 60%)`,
-          }}
-        />
-      )}
-
-      {/* ── CARD HEADER: Banner Image + Badges ── */}
-      <div className="relative h-48 overflow-hidden bg-black/60">
+      {/* ── CARD COVER BANNER (Aspect 16:9) ── */}
+      <div className="relative aspect-video w-full overflow-hidden bg-black/60">
         <img
-          src={tournament.bannerUrl}
-          alt={tournament.title}
-          className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-108"
+          src={imgSrc}
+          alt={`${tournament.title} Cover`}
+          loading={priority ? 'eager' : 'lazy'}
+          decoding="async"
+          width={800}
+          height={450}
+          onLoad={() => setImageLoaded(true)}
+          onError={() => setImgSrc('/images/games/game-fallback.webp')}
+          className={`w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105 ${
+            imageLoaded ? 'opacity-100' : 'opacity-80'
+          }`}
         />
 
-        {/* Ambient Gradient overlay */}
+        {/* Cinematic Gradient overlay for text readability */}
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 pointer-events-none"
           style={{
             background:
-              'linear-gradient(180deg, rgba(6, 8, 22, 0.25) 0%, rgba(6, 8, 22, 0.7) 60%, rgba(12, 16, 36, 0.98) 100%)',
+              'linear-gradient(180deg, rgba(6, 8, 22, 0.4) 0%, rgba(6, 8, 22, 0.2) 40%, rgba(12, 16, 36, 0.95) 100%)',
           }}
         />
 
-        {/* Top Badges: Countdown Timer on Left, Game Pill on Right */}
+        {/* Top Badges: Game Tag Pill on Left, Status Pill on Right */}
         <div className="absolute top-3 inset-x-3 flex items-center justify-between z-10">
-          {/* Countdown Pill (Dribbble style) */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/75 backdrop-blur-md border border-white/15 font-mono text-[10px] text-white font-semibold shadow-md">
-            <Clock className="w-3 h-3 text-cyan-300" />
-            <span>{randomCountdown}</span>
-          </div>
-
-          {/* Game Tag Pill */}
+          {/* Game Tag Badge */}
           <div
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-mono text-[10px] font-bold shadow-md"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-mono text-[11px] font-bold shadow-lg backdrop-blur-md"
             style={{
-              background: 'rgba(0, 0, 0, 0.8)',
+              background: 'rgba(10, 14, 30, 0.85)',
               border: `1px solid ${gameStyle.primary}60`,
               color: gameStyle.primary,
             }}
@@ -194,108 +227,114 @@ export const TournamentCard: React.FC<TournamentCardProps> = ({
             <span>{gameStyle.emoji}</span>
             <span>{gameStyle.label}</span>
           </div>
+
+          {/* Status Badge */}
+          <div
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-mono text-[10px] font-bold uppercase tracking-wider backdrop-blur-md shadow-lg border ${statusBadge.bg} ${statusBadge.border} ${statusBadge.text}`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dot}`} />
+            <span>{statusBadge.label}</span>
+          </div>
         </div>
 
-        {/* Status indicator on bottom of banner */}
-        <div className="absolute bottom-2.5 left-3 z-10 flex items-center gap-2">
-          <span className="font-mono text-[10px] font-bold text-slate-400 tracking-wider">
-            {formattedDate}
-          </span>
-          {tournament.status === 'CHECK_IN_LIVE' && (
-            <span className="px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/50 font-mono text-[9px] text-rose-400 font-bold flex items-center gap-1 animate-pulse">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-              LIVE
-            </span>
-          )}
+        {/* Date overlay bottom left */}
+        <div className="absolute bottom-2.5 left-3 z-10 flex items-center gap-1.5 font-mono text-[11px] text-slate-300">
+          <Calendar className="w-3.5 h-3.5 text-cyan-400" />
+          <span>{formattedDate}</span>
+        </div>
+
+        {/* Region bottom right */}
+        <div className="absolute bottom-2.5 right-3 z-10 font-mono text-[10px] text-slate-400">
+          {tournament.region}
         </div>
       </div>
 
-      {/* ── CARD BODY: Title, Details, Reward & Join ── */}
-      <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between gap-4 relative z-10">
+      {/* ── CARD BODY ── */}
+      <div className="p-4 flex-1 flex flex-col justify-between gap-3">
         <div>
-          {/* Title */}
+          {/* Format badge */}
+          <div className="flex items-center gap-2 mb-1.5 font-mono text-[11px] text-cyan-400/90 font-medium">
+            <span>{tournament.format}</span>
+            <span>•</span>
+            <span>{tournament.teamSize}</span>
+          </div>
+
+          {/* Tournament Title */}
           <Link
             to={`/tournaments/${tournament.id}`}
             onClick={playCyberClick}
-            className="text-decoration-none"
+            className="block font-['Rajdhani'] font-bold text-lg text-white hover:text-cyan-300 transition-colors line-clamp-1 leading-snug"
           >
-            <h3 className="font-['Rajdhani'] font-bold text-lg text-white group-hover:text-cyan-300 transition-colors line-clamp-1 leading-snug">
-              {tournament.title}
-            </h3>
+            {tournament.title}
           </Link>
 
-          {/* Description Excerpt */}
-          <p className="mt-1.5 text-xs text-slate-400 font-normal line-clamp-2 leading-relaxed">
+          {/* Description */}
+          <p className="text-xs text-slate-400 line-clamp-2 mt-1 leading-relaxed">
             {tournament.description}
           </p>
         </div>
 
-        {/* Format Chips */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="font-mono text-[10px] px-2 py-0.5 rounded-md bg-violet-950/40 border border-violet-500/25 text-violet-300 font-medium">
-            {tournament.format}
-          </span>
-          <span className="font-mono text-[10px] px-2 py-0.5 rounded-md bg-cyan-950/30 border border-cyan-500/25 text-cyan-300 font-medium">
-            {tournament.teamSize}
-          </span>
-          <span className="font-mono text-[10px] px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-slate-300 font-medium">
-            {tournament.region}
-          </span>
-        </div>
-
-        {/* Prize Pool Pill & Join Button (Direct Dribbble Match) */}
-        <div className="pt-2 border-t border-violet-500/15 flex items-center gap-2">
-          {/* Neon Points / Prize Badge */}
-          <div
-            className="flex-1 px-3 py-2 rounded-xl flex items-center justify-center font-['Rajdhani'] font-black text-xs uppercase tracking-wider shadow-md"
-            style={{
-              background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
-              color: '#0A0E1A',
-              boxShadow: '0 4px 15px -3px rgba(245, 158, 11, 0.35)',
-            }}
-          >
-            <Zap className="w-3.5 h-3.5 mr-1 fill-black" />
-            <span className="truncate">{tournament.prizePool}</span>
+        {/* Key Stats Bar: Prize Pool & Capacity */}
+        <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/60">
+          <div>
+            <div className="flex items-center gap-1 text-[10px] font-mono text-slate-400 uppercase tracking-wider">
+              <Trophy className="w-3 h-3 text-amber-400" />
+              <span>Prize Pool</span>
+            </div>
+            <div className="font-['Rajdhani'] font-bold text-sm text-amber-300 truncate mt-0.5">
+              {tournament.prizePool || 'Glory & Rating'}
+            </div>
           </div>
 
-          {/* Join Tournament Button */}
-          <button
-            onClick={() => {
-              playCyberClick()
-              if (onRegisterClick) onRegisterClick(tournament)
-            }}
-            disabled={isFull}
-            className={`px-4 py-2 rounded-xl font-['Rajdhani'] font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1 shadow-md ${
-              isFull
-                ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                : 'bg-violet-600 hover:bg-violet-500 text-white shadow-violet-600/30 hover:shadow-violet-600/50'
-            }`}
-          >
-            <span>{isFull ? 'Bracket Full' : 'Enter'}</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          <div>
+            <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 uppercase tracking-wider">
+              <span className="flex items-center gap-1">
+                <Users className="w-3 h-3 text-cyan-400" />
+                <span>Slots</span>
+              </span>
+              <span className={isFull ? 'text-rose-400 font-bold' : 'text-slate-300'}>
+                {tournament.currentTeams}/{tournament.maxTeams}
+              </span>
+            </div>
+            {/* Slot Capacity Progress Bar */}
+            <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1.5">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  isFull
+                    ? 'bg-rose-500'
+                    : capacityPct > 80
+                    ? 'bg-amber-400'
+                    : 'bg-gradient-to-r from-cyan-500 to-violet-500'
+                }`}
+                style={{ width: `${capacityPct}%` }}
+              />
+            </div>
+          </div>
         </div>
 
-        {/* Capacity Bar at very bottom */}
-        <div className="w-full">
-          <div className="flex items-center justify-between font-mono text-[9px] text-slate-400 mb-1">
-            <span>Slots Confirmed</span>
-            <span className="font-semibold text-slate-300">
-              {tournament.currentTeams}/{tournament.maxTeams} Teams
-            </span>
-          </div>
-          <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${capacityPct}%`,
-                background:
-                  capacityPct > 80
-                    ? 'linear-gradient(90deg, #F59E0B, #EF4444)'
-                    : 'linear-gradient(90deg, #7C3AED, #00D4FF)',
+        {/* Action Controls */}
+        <div className="flex items-center gap-2 pt-1">
+          <Link
+            to={`/tournaments/${tournament.id}`}
+            onClick={playCyberClick}
+            className="flex-1 py-2 px-3 rounded-xl border border-violet-500/30 bg-violet-950/20 hover:bg-violet-900/30 text-xs font-['Rajdhani'] font-bold text-slate-200 hover:text-white flex items-center justify-center gap-1.5 transition-colors"
+          >
+            <span>View Details</span>
+            <ArrowRight className="w-3.5 h-3.5 text-cyan-400" />
+          </Link>
+
+          {isRegistrationOpen && !isFull && onRegisterClick && (
+            <button
+              onClick={() => {
+                playCyberClick()
+                onRegisterClick(tournament)
               }}
-            />
-          </div>
+              className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-xs font-['Rajdhani'] font-bold text-slate-950 shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 transition-all transform hover:scale-[1.02]"
+            >
+              <Zap className="w-3.5 h-3.5 fill-current" />
+              <span>Register</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

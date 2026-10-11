@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Trophy, Users, Award, Calendar, Menu, X, Bell, ChevronDown, Zap, Shield } from 'lucide-react'
+import { Trophy, Users, Award, Calendar, Menu, X, Bell, ChevronDown, Zap, Shield, Tv } from 'lucide-react'
 
 const NAV_LINKS = [
   { name: 'Tournaments', path: '/tournaments', icon: Trophy },
+  { name: 'Streams', path: '/streams', icon: Tv },
   { name: 'Teams', path: '/teams', icon: Users },
   { name: 'Leaderboards', path: '/leaderboards', icon: Award },
   { name: 'Seasons', path: '/seasons', icon: Calendar },

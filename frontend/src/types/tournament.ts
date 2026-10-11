@@ -11,6 +11,7 @@ export type TournamentFormat =
   | 'Round Robin'
   | 'Swiss'
   | 'Battle Royale Squads'
+  | 'Battle Royale Duos'
   | 'Speedrun & Arena Combat'
   | 'Trios Match Point'
 
@@ -18,7 +19,7 @@ export interface Tournament {
   id: string
   title: string
   gameTitle: string
-  gameCode: 'valorant' | 'cs2' | 'lol' | 'rocket-league' | 'dota2' | 'apex' | 'bgmi' | 'cyberpunk'
+  gameCode: 'valorant' | 'cs2' | 'lol' | 'rocket-league' | 'dota2' | 'apex' | 'bgmi' | 'cyberpunk' | 'pubg-mobile' | 'fortnite' | 'pubg-battlegrounds'
   bannerUrl: string
   format: TournamentFormat
   status: TournamentStatus
@@ -27,6 +28,7 @@ export interface Tournament {
   maxTeams: number
   prizePool: string
   startDate: string
+  registrationDeadline?: string
   region: string
   organizer: {
     name: string

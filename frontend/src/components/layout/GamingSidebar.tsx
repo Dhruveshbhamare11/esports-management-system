@@ -41,10 +41,19 @@ export const GamingSidebar: React.FC<GamingSidebarProps> = ({
     return location.pathname.startsWith(path)
   }
 
-  const navItems = [
+  interface NavItem {
+    label: string
+    path: string
+    icon: React.ComponentType<{ className?: string }>
+    badge?: string
+    badgeColor?: string
+    isAction?: boolean
+  }
+
+  const navItems: NavItem[] = [
     { label: 'Dashboard', path: '/', icon: LayoutDashboard },
     { label: 'Tournaments', path: '/tournaments', icon: Trophy, badge: '12', badgeColor: '#F59E0B' },
-    { label: 'Live Streams', path: '#streams', icon: Tv, badge: 'LIVE', badgeColor: '#FF3131', isAction: true },
+    { label: 'Live Streams', path: '/streams', icon: Tv, badge: 'LIVE', badgeColor: '#FF3131' },
     { label: 'Squads & Teams', path: '/teams', icon: Users },
     { label: 'Leaderboards', path: '/leaderboards', icon: Award },
     { label: 'Season Pass', path: '/seasons', icon: Sparkles, badge: 'S4', badgeColor: '#00E5FF' },

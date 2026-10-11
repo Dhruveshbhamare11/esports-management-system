@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { X, Shield, ChevronRight, Trophy, Users, Award, Calendar } from 'lucide-react'
+import { X, Shield, ChevronRight, Trophy, Users, Award, Calendar, Tv } from 'lucide-react'
 import { Button } from '../common/Button'
 
 interface NavLinkItem {
@@ -18,6 +18,7 @@ interface MobileNavProps {
 
 const DEFAULT_LINKS: NavLinkItem[] = [
   { name: 'Tournaments', path: '/tournaments', icon: <Trophy className="w-4 h-4 text-amber-400" /> },
+  { name: 'Live Streams', path: '/streams', icon: <Tv className="w-4 h-4 text-rose-400" /> },
   { name: 'Teams & Squads', path: '/teams', icon: <Users className="w-4 h-4 text-cyan-400" /> },
   { name: 'Leaderboards', path: '/leaderboards', icon: <Award className="w-4 h-4 text-purple-400" /> },
   { name: 'Season 4 Circuit', path: '/seasons', icon: <Calendar className="w-4 h-4 text-emerald-400" /> },

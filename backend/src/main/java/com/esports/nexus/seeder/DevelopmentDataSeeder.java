@@ -73,127 +73,185 @@ public class DevelopmentDataSeeder implements CommandLineRunner {
             return;
         }
 
-        if (gameRepository.count() > 0) {
-            logger.info("Existing database records detected. Skipping development seeder.");
-            return;
-        }
+        logger.info("Synchronizing eSports Nexus official games and tournaments...");
 
-        logger.info("Initializing eSports Nexus development seed data...");
+        // 1. Seed or Retrieve Canonical Games
+        Game valorant = getOrCreateGame("Valorant", "valorant", "Tactical FPS", 5, "/images/games/valorant.webp");
+        Game cs2 = getOrCreateGame("Counter-Strike 2", "cs2", "Tactical FPS", 5, "/images/games/counter-strike-2.webp");
+        Game lol = getOrCreateGame("League of Legends", "lol", "MOBA", 5, "/images/games/league-of-legends.webp");
+        Game pubgMobile = getOrCreateGame("PUBG MOBILE", "pubg-mobile", "Battle Royale", 4, "/images/games/pubg-mobile.webp");
+        Game bgmi = getOrCreateGame("BGMI", "bgmi", "Battle Royale", 4, "/images/games/bgmi.webp");
+        Game fortnite = getOrCreateGame("Fortnite", "fortnite", "Battle Royale", 2, "/images/games/fortnite.webp");
+        Game pubg = getOrCreateGame("PUBG: BATTLEGROUNDS", "pubg-battlegrounds", "Battle Royale", 4, "/images/games/pubg-battlegrounds.webp");
+        Game rl = getOrCreateGame("Rocket League", "rocket-league", "Vehicular Sports", 3, "/images/games/game-fallback.webp");
+        Game dota2 = getOrCreateGame("Dota 2", "dota2", "MOBA", 5, "/images/games/game-fallback.webp");
 
-        // 1. Seed Games
-        Game valorant = new Game("Valorant", "valorant", "Tactical FPS", 5,
-                "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80");
-        Game cs2 = new Game("Counter-Strike 2", "cs2", "Tactical FPS", 5,
-                "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1200&q=80");
-        Game lol = new Game("League of Legends", "lol", "MOBA", 5,
-                "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=1200&q=80");
-        Game rl = new Game("Rocket League", "rocket-league", "Vehicular Sports", 3,
-                "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=1200&q=80");
-        Game dota2 = new Game("Dota 2", "dota2", "MOBA", 5,
-                "https://images.unsplash.com/photo-1579373903781-fd5c0c30c4cd?auto=format&fit=crop&w=1200&q=80");
-
-        gameRepository.save(valorant);
-        gameRepository.save(cs2);
-        gameRepository.save(lol);
-        gameRepository.save(rl);
-        gameRepository.save(dota2);
-
-        // 2. Seed Demo Users
-        // Default dev password is "NexusPlayer#2026" hashed with BCrypt
+        // 2. Seed Demo Users (if absent)
         String defaultHashedPassword = passwordEncoder.encode("NexusPlayer#2026");
 
-        User captainKaizen = new User("kaizen_v", "kaizen@nexus.gg", defaultHashedPassword);
-        captainKaizen.addRole(Role.CAPTAIN);
-        userRepository.save(captainKaizen);
+        User captainKaizen = userRepository.findByUsername("kaizen_v").orElseGet(() -> {
+            User u = new User("kaizen_v", "kaizen@nexus.gg", defaultHashedPassword);
+            u.addRole(Role.CAPTAIN);
+            userRepository.save(u);
+            PlayerProfile p = new PlayerProfile(u, "Kaizen Vanguard");
+            p.setLevel(42);
+            p.setXp(8750);
+            p.setRankTier("Apex Challenger (Division I)");
+            p.setBio("Competitive Valorant IGL & Initiator. Leading Vanguard Sentinels in Season 4.");
+            p.setAvatarUrl("https://images.unsplash.com/photo-1566492031773-4f4e44671857?auto=format&fit=crop&w=300&q=80");
+            playerProfileRepository.save(p);
+            return u;
+        });
 
-        PlayerProfile profileKaizen = new PlayerProfile(captainKaizen, "Kaizen Vanguard");
-        profileKaizen.setLevel(42);
-        profileKaizen.setXp(8750);
-        profileKaizen.setRankTier("Apex Challenger (Division I)");
-        profileKaizen.setBio("Competitive Valorant IGL & Initiator. Leading Vanguard Sentinels in Season 4.");
-        profileKaizen.setAvatarUrl("https://images.unsplash.com/photo-1566492031773-4f4e44671857?auto=format&fit=crop&w=300&q=80");
-        playerProfileRepository.save(profileKaizen);
+        User captainValkyrie = userRepository.findByUsername("valkyriex").orElseGet(() -> {
+            User u = new User("valkyriex", "valkyrie@nexus.gg", defaultHashedPassword);
+            u.addRole(Role.CAPTAIN);
+            userRepository.save(u);
+            PlayerProfile p = new PlayerProfile(u, "ValkyrieX");
+            p.setLevel(38);
+            p.setXp(7120);
+            p.setRankTier("Master Tier");
+            playerProfileRepository.save(p);
+            return u;
+        });
 
-        User captainValkyrie = new User("valkyriex", "valkyrie@nexus.gg", defaultHashedPassword);
-        captainValkyrie.addRole(Role.CAPTAIN);
-        userRepository.save(captainValkyrie);
+        User organizerUser = userRepository.findByUsername("nexus_organizer").orElseGet(() -> {
+            User u = new User("nexus_organizer", "organizer@nexus.gg", defaultHashedPassword);
+            u.addRole(Role.ORGANIZER);
+            userRepository.save(u);
+            PlayerProfile p = new PlayerProfile(u, "Nexus Tournament Ops");
+            playerProfileRepository.save(p);
+            return u;
+        });
 
-        PlayerProfile profileValkyrie = new PlayerProfile(captainValkyrie, "ValkyrieX");
-        profileValkyrie.setLevel(38);
-        profileValkyrie.setXp(7120);
-        profileValkyrie.setRankTier("Master Tier");
-        playerProfileRepository.save(profileValkyrie);
+        // 3. Seed Demo Teams (if absent)
+        Team sentinels = teamRepository.findByTag("VNG").orElseGet(() -> {
+            Team t = new Team(
+                    "Vanguard Sentinels", "VNG", valorant, captainKaizen,
+                    "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80",
+                    "Premier collegiate Valorant varsity squad competing in Division I.",
+                    "North America", "Premier Division"
+            );
+            t.setSeasonPoints(1420);
+            t.setRecruiting(false);
+            teamRepository.save(t);
+            TeamMember m = new TeamMember(t, captainKaizen, TeamMemberRole.CAPTAIN);
+            teamMemberRepository.save(m);
+            t.addMember(m);
+            return t;
+        });
 
-        User organizerUser = new User("nexus_organizer", "organizer@nexus.gg", defaultHashedPassword);
-        organizerUser.addRole(Role.ORGANIZER);
-        userRepository.save(organizerUser);
+        Team eclipse = teamRepository.findByTag("ECL").orElseGet(() -> {
+            Team t = new Team(
+                    "Eclipse Syndicate", "ECL", cs2, captainValkyrie,
+                    "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=200&q=80",
+                    "European Tier-2 Counter-Strike roster focused on tactical executions.",
+                    "Europe West", "Master Tier"
+            );
+            t.setSeasonPoints(1290);
+            t.setRecruiting(true);
+            teamRepository.save(t);
+            TeamMember m = new TeamMember(t, captainValkyrie, TeamMemberRole.CAPTAIN);
+            teamMemberRepository.save(m);
+            t.addMember(m);
+            return t;
+        });
 
-        PlayerProfile profileOrganizer = new PlayerProfile(organizerUser, "Nexus Tournament Ops");
-        playerProfileRepository.save(profileOrganizer);
-
-        // 3. Seed Demo Teams
-        Team sentinels = new Team(
-                "Vanguard Sentinels", "VNG", valorant, captainKaizen,
-                "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80",
-                "Premier collegiate Valorant varsity squad competing in Division I.",
-                "North America", "Premier Division"
+        // 4. Seed Canonical Tournaments Idempotently
+        seedTournamentIfMissing(
+                "PUBG MOBILE — Battle Royale Championship",
+                pubgMobile, organizerUser, "/images/games/pubg-mobile.webp",
+                TournamentFormat.ROUND_ROBIN, TournamentStatus.REGISTRATION_OPEN,
+                "4v4 Squads", 25, "$20,000 USD", "South Asia / Global",
+                Instant.now().plus(14, ChronoUnit.DAYS), Instant.now().plus(12, ChronoUnit.DAYS),
+                "Official community championship for PUBG MOBILE. 25 elite squads battle across Erangel and Miramar with standard competitive point matrices."
         );
-        sentinels.setSeasonPoints(1420);
-        sentinels.setRecruiting(false);
-        teamRepository.save(sentinels);
 
-        TeamMember member1 = new TeamMember(sentinels, captainKaizen, TeamMemberRole.CAPTAIN);
-        teamMemberRepository.save(member1);
-        sentinels.addMember(member1);
-
-        Team eclipse = new Team(
-                "Eclipse Syndicate", "ECL", cs2, captainValkyrie,
-                "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=200&q=80",
-                "European Tier-2 Counter-Strike roster focused on tactical executions.",
-                "Europe West", "Master Tier"
+        seedTournamentIfMissing(
+                "BGMI — India Squad Showdown",
+                bgmi, organizerUser, "/images/games/bgmi.webp",
+                TournamentFormat.SINGLE_ELIMINATION, TournamentStatus.CHECK_IN_LIVE,
+                "4v4 Squads", 20, "15,000 PTS / $12,500 USD", "India / South Asia",
+                Instant.now().plus(7, ChronoUnit.DAYS), Instant.now().plus(5, ChronoUnit.DAYS),
+                "High-octane BGMI battle royale showdown featuring top tier roster matchups, real-time broadcast telemetry, and anti-cheat verification."
         );
-        eclipse.setSeasonPoints(1290);
-        eclipse.setRecruiting(true);
-        teamRepository.save(eclipse);
 
-        TeamMember member2 = new TeamMember(eclipse, captainValkyrie, TeamMemberRole.CAPTAIN);
-        teamMemberRepository.save(member2);
-        eclipse.addMember(member2);
-
-        // 4. Seed Demo Tournaments
-        Tournament apexChampionship = new Tournament(
-                "Nexus Apex Championship 2026", valorant, organizerUser,
-                "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80",
+        Tournament valTournament = seedTournamentIfMissing(
+                "VALORANT — Tactical Masters Cup",
+                valorant, organizerUser, "/images/games/valorant.webp",
                 TournamentFormat.SINGLE_ELIMINATION, TournamentStatus.REGISTRATION_OPEN,
                 "5v5", 16, "$15,000 USD", "North America",
-                Instant.now().plus(14, ChronoUnit.DAYS),
-                Instant.now().plus(12, ChronoUnit.DAYS),
-                "The premier collegiate Valorant championship of Season 4. 16 qualifying squads."
+                Instant.now().plus(18, ChronoUnit.DAYS), Instant.now().plus(15, ChronoUnit.DAYS),
+                "Premier tactical FPS showcase. 16 qualifying collegiate and amateur rosters face off in double-elimination bracket play."
         );
-        tournamentRepository.save(apexChampionship);
 
-        Tournament cs2Open = new Tournament(
-                "Counter-Strike 2 Ironclad Open", cs2, organizerUser,
-                "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1200&q=80",
-                TournamentFormat.DOUBLE_ELIMINATION, TournamentStatus.CHECK_IN_LIVE,
+        Tournament cs2Tournament = seedTournamentIfMissing(
+                "Counter-Strike 2 — Elite Strike Series",
+                cs2, organizerUser, "/images/games/counter-strike-2.webp",
+                TournamentFormat.DOUBLE_ELIMINATION, TournamentStatus.IN_PROGRESS,
                 "5v5", 32, "$25,000 USD", "Europe & UK",
-                Instant.now().plus(8, ChronoUnit.DAYS),
-                Instant.now().plus(6, ChronoUnit.DAYS),
-                "Tier-2 invitational featuring Europe's highest ranked amateur squads."
+                Instant.now().plus(5, ChronoUnit.DAYS), Instant.now().plus(3, ChronoUnit.DAYS),
+                "Tier-2 invitational featuring Europe's highest ranked amateur squads on dedicated 128-tick tournament servers."
         );
-        tournamentRepository.save(cs2Open);
 
-        // 5. Seed Registration
-        Registration reg1 = new Registration(apexChampionship, sentinels, captainKaizen, "Varsity roster roster-checked");
-        registrationRepository.save(reg1);
-        apexChampionship.setCurrentTeams(1);
-        tournamentRepository.save(apexChampionship);
+        seedTournamentIfMissing(
+                "League of Legends — Rift Champions",
+                lol, organizerUser, "/images/games/league-of-legends.webp",
+                TournamentFormat.SINGLE_ELIMINATION, TournamentStatus.UPCOMING,
+                "5v5", 16, "$10,000 USD + Scholarships", "Global / Collegiate",
+                Instant.now().plus(25, ChronoUnit.DAYS), Instant.now().plus(22, ChronoUnit.DAYS),
+                "Summoner's Rift competitive invitational featuring best-of-3 quarter-finals and best-of-5 championship matches."
+        );
 
-        Registration reg2 = new Registration(cs2Open, eclipse, captainValkyrie, "Official invitation accepted");
-        registrationRepository.save(reg2);
-        cs2Open.setCurrentTeams(1);
-        tournamentRepository.save(cs2Open);
+        seedTournamentIfMissing(
+                "Fortnite — Zero Build Open",
+                fortnite, organizerUser, "/images/games/fortnite.webp",
+                TournamentFormat.ROUND_ROBIN, TournamentStatus.REGISTRATION_OPEN,
+                "2v2 Duos", 50, "$18,000 USD", "Global Online",
+                Instant.now().plus(10, ChronoUnit.DAYS), Instant.now().plus(8, ChronoUnit.DAYS),
+                "High-mobility Zero Build tournament testing gunplay, movement mechanics, and rotational awareness in custom private lobbies."
+        );
 
-        logger.info("eSports Nexus development seed data successfully applied.");
+        // 5. Seed Initial Registrations if Tournament is empty
+        if (valTournament != null && valTournament.getCurrentTeams() == 0) {
+            Registration reg1 = new Registration(valTournament, sentinels, captainKaizen, "Varsity roster verified");
+            registrationRepository.save(reg1);
+            valTournament.setCurrentTeams(1);
+            tournamentRepository.save(valTournament);
+        }
+
+        if (cs2Tournament != null && cs2Tournament.getCurrentTeams() == 0) {
+            Registration reg2 = new Registration(cs2Tournament, eclipse, captainValkyrie, "Official invitation accepted");
+            registrationRepository.save(reg2);
+            cs2Tournament.setCurrentTeams(1);
+            tournamentRepository.save(cs2Tournament);
+        }
+
+        logger.info("eSports Nexus games and tournament sync completed successfully.");
+    }
+
+    private Game getOrCreateGame(String name, String code, String genre, int teamSize, String bannerUrl) {
+        return gameRepository.findByCode(code).orElseGet(() -> {
+            Game g = new Game(name, code, genre, teamSize, bannerUrl);
+            return gameRepository.save(g);
+        });
+    }
+
+    private Tournament seedTournamentIfMissing(
+            String title, Game game, User organizer, String bannerUrl,
+            TournamentFormat format, TournamentStatus status,
+            String teamSizeFormat, int maxTeams, String prizePool, String region,
+            Instant startDate, Instant registrationDeadline, String description) {
+
+        if (tournamentRepository.existsByTitle(title)) {
+            return null;
+        }
+
+        Tournament tournament = new Tournament(
+                title, game, organizer, bannerUrl,
+                format, status, teamSizeFormat, maxTeams,
+                prizePool, region, startDate, registrationDeadline, description
+        );
+        return tournamentRepository.save(tournament);
     }
 }

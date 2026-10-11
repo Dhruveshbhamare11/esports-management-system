@@ -25,9 +25,21 @@
   <b>A state-of-the-art competitive gaming ecosystem featuring interactive 3D WebGL scenes, live tournament brackets, verified squad rosters, and enterprise-grade Spring Boot architecture.</b>
 </p>
 
+<p align="center">
+  <a href="https://esports-management-system.vercel.app/" target="_blank">
+    <img src="https://img.shields.io/badge/Live_Demo-Vercel_Frontend-black?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo" />
+  </a>
+  <a href="https://esports-management-system-nw4h.onrender.com/api/v1/games" target="_blank">
+    <img src="https://img.shields.io/badge/Cloud_API-Render_Backend-46E3B7?style=for-the-badge&logo=render&logoColor=black" alt="Render Backend" />
+  </a>
+  <a href="https://railway.app" target="_blank">
+    <img src="https://img.shields.io/badge/Database-Railway_MySQL-0B0D0E?style=for-the-badge&logo=railway&logoColor=white" alt="Railway MySQL" />
+  </a>
+</p>
+
 ---
 
-[Key Features](#-key-features) • [System Architecture](#-system-architecture) • [Tech Stack](#-technology-stack) • [Quickstart Guide](#-quickstart-guide) • [API Reference](#-api-reference) • [Demo Accounts](#-demo-accounts)
+[Live Demo](https://esports-management-system.vercel.app/) • [Key Features](#-key-features) • [System Architecture](#-system-architecture) • [Tech Stack](#-technology-stack) • [Quickstart Guide](#-quickstart-guide) • [API Reference](#-api-reference) • [Demo Accounts](#-demo-accounts)
 
 ---
 
